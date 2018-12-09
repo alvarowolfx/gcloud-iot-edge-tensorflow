@@ -5,6 +5,8 @@
   },
   "files.associations": {
     "sdkconfig.h": "c",
-    "qr_recoginize.h": "c"
+    "qr_recoginize.h": "c",
+    "ov2640.h": "c",
+    "sensor.h": "c"
   }
 }

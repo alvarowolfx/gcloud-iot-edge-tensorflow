@@ -24,6 +24,7 @@
 
 #include "esp_system.h"
 #include "esp_wifi.h"
+#include "mdns.h"
 #include "esp_event_loop.h"
 #include "esp_log.h"
 #include "esp_err.h"
@@ -41,6 +42,7 @@ static void handle_jpg(http_context_t http_ctx, void* ctx);
 static void handle_jpg_stream(http_context_t http_ctx, void* ctx);
 static esp_err_t event_handler(void *ctx, system_event_t *event);
 static void initialise_wifi(void);
+static void start_mdns_service(void);
 
 static const char* TAG = "camera_demo";
 
@@ -55,11 +57,10 @@ static ip4_addr_t s_ip_addr;
 static camera_pixelformat_t s_pixel_format;
 
 #define CAMERA_PIXEL_FORMAT CAMERA_PF_JPEG
-#define CAMERA_FRAME_SIZE CAMERA_FS_QQVGA
-
+#define CAMERA_FRAME_SIZE CAMERA_FS_SVGA
 
 void app_main()
-{    
+{     
 
     esp_log_level_set("wifi", ESP_LOG_WARN);
     esp_log_level_set("gpio", ESP_LOG_WARN);    
@@ -123,8 +124,10 @@ void app_main()
 //    databuf = (char *) malloc(BUF_SIZE);
     initialise_wifi();
 
+    start_mdns_service();
+
     http_server_t server;
-    http_server_options_t http_options = HTTP_SERVER_OPTIONS_DEFAULT();
+    http_server_options_t http_options = HTTP_SERVER_OPTIONS_DEFAULT();    
     ESP_ERROR_CHECK( http_server_start(&http_options, &server) );
 
     if (s_pixel_format == CAMERA_PF_GRAYSCALE) {
@@ -323,6 +326,30 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
             break;
     }
     return ESP_OK;
+}
+
+void start_mdns_service()
+{
+    //initialize mDNS service
+    esp_err_t err = mdns_init();    
+    if (err) {
+        printf("MDNS Init failed: %d\n", err);
+        return;
+    }    
+
+    uint64_t chipId = 0LL;
+    esp_efuse_mac_get_default((uint8_t*) (&chipId));
+    char id[4];
+    sprintf(id, "%04x", (uint16_t)(chipId>>32));
+
+    char name[18] = "indoor-camera-";    
+    strcat(name, id);    
+            
+    mdns_service_add(NULL, "_tracking", "_tcp", 80, NULL, 0);
+    mdns_service_instance_name_set("_tracking", "_tcp", name);
+
+
+    ESP_LOGI(TAG, "MDNS domain: %s", name);
 }
 
 static void initialise_wifi(void)

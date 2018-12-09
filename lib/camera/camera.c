@@ -139,11 +139,11 @@ esp_err_t camera_probe(const camera_config_t* config,
 	conf.mode = GPIO_MODE_OUTPUT;
 	gpio_config(&conf);
 
-	gpio_set_level(config->pin_reset, 1);
-	delay(3000);
-
 	gpio_set_level(config->pin_reset, 0);
-	delay(1000);
+	delay(10);
+
+	gpio_set_level(config->pin_reset, 1);
+	delay(10);
 
 #if CONFIG_OV2640_SUPPORT
 	uint8_t buf[] = {0xff, 0x01};
