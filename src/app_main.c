@@ -59,10 +59,11 @@ static camera_pixelformat_t s_pixel_format;
 
 
 void app_main()
-{
+{    
+
     esp_log_level_set("wifi", ESP_LOG_WARN);
-    esp_log_level_set("gpio", ESP_LOG_WARN);
-    esp_err_t err = nvs_flash_init();
+    esp_log_level_set("gpio", ESP_LOG_WARN);    
+    esp_err_t err = nvs_flash_init();    
     if (err != ESP_OK) {
         ESP_ERROR_CHECK( nvs_flash_erase() );
         ESP_ERROR_CHECK( nvs_flash_init() );

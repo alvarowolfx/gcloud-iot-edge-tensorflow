@@ -1,0 +1,10 @@
+{
+  "terminal.integrated.env.osx": {
+    "PATH": "/Users/alvaroviebrantz/.platformio/penv/bin:/Users/alvaroviebrantz/.platformio/penv:/Users/alvaroviebrantz/bin:/Users/alvaroviebrantz/Library/Android/sdk/tools/bin:/Users/alvaroviebrantz/Library/Android/sdk/platform-tools:/Users/alvaroviebrantz/Documents/Desenvolvimento/google-cloud-sdk/bin:/Users/alvaroviebrantz/.mos/bin:/Users/alvaroviebrantz/Documents/Desenvolvimento/Flutter/sdk/bin:/Users/alvaroviebrantz/.nvm/versions/node/v8.11.1/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/go/bin:/Users/alvaroviebrantz/Documents/Desenvolvimento/go/gocode/bin",
+    "PLATFORMIO_CALLER": "vscode"
+  },
+  "files.associations": {
+    "sdkconfig.h": "c",
+    "qr_recoginize.h": "c"
+  }
+}
