@@ -344,9 +344,10 @@ void start_mdns_service()
 
     char name[18] = "indoor-camera-";    
     strcat(name, id);    
-            
-    mdns_service_add(NULL, "_tracking", "_tcp", 80, NULL, 0);
-    mdns_service_instance_name_set("_tracking", "_tcp", name);
+
+    mdns_hostname_set(name);        
+    mdns_service_add(NULL, "_camera", "_tcp", 80, NULL, 0);
+    mdns_service_instance_name_set("_camera", "_tcp", name);
 
 
     ESP_LOGI(TAG, "MDNS domain: %s", name);
