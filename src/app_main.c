@@ -108,8 +108,9 @@ void app_main()
         ESP_LOGI(TAG, "Detected OV2640 camera, using JPEG format");
         s_pixel_format = CAMERA_PIXEL_FORMAT;
         camera_config.frame_size = CAMERA_FRAME_SIZE;
-        if (s_pixel_format == CAMERA_PF_JPEG)
-        camera_config.jpeg_quality = 15;
+        if (s_pixel_format == CAMERA_PF_JPEG){
+          camera_config.jpeg_quality = 15;
+        }
     } else {
         ESP_LOGE(TAG, "Camera not supported");
         return;
@@ -219,19 +220,19 @@ static void handle_rgb_bmp(http_context_t http_ctx, void* ctx)
 
 static void handle_jpg(http_context_t http_ctx, void* ctx)
 {
-	if(get_light_state())
-		led_open();
-    esp_err_t err = camera_run();
-    if (err != ESP_OK) {
-        ESP_LOGD(TAG, "Camera capture failed with error = %d", err);
-        return;
-    }
+	//if(get_light_state())
+		// led_open();
+  esp_err_t err = camera_run();
+  if (err != ESP_OK) {
+      ESP_LOGD(TAG, "Camera capture failed with error = %d", err);
+      return;
+  }
 
-    http_response_begin(http_ctx, 200, "image/jpeg", camera_get_data_size());
-    http_response_set_header(http_ctx, "Content-disposition", "inline; filename=capture.jpg");
-    write_frame(http_ctx);
-    http_response_end(http_ctx);
-    led_close();
+  http_response_begin(http_ctx, 200, "image/jpeg", camera_get_data_size());
+  http_response_set_header(http_ctx, "Content-disposition", "inline; filename=capture.jpg");
+  write_frame(http_ctx);
+  http_response_end(http_ctx);
+  // led_close();
 }
 
 
