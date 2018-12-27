@@ -28,6 +28,7 @@ esp_err_t camera_enable_out_clock(camera_config_t* config) {
 		ch_conf.duty = 1;
 		ch_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
 		ch_conf.gpio_num = config->pin_xclk;
+    ch_conf.hpoint = 0;
 		err = ledc_channel_config(&ch_conf);
 		if (err != ESP_OK) {
 			ESP_LOGE(TAG, "ledc_channel_config failed, rc=%x", err);

@@ -1,0 +1,121 @@
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width,initial-scale=1,minimal-ui" name="viewport">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700,400italic|Material+Icons">
+  <link rel="stylesheet" href="https://unpkg.com/vue-material@beta/dist/vue-material.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/vue-material@beta/dist/theme/default.css">
+  <style>
+    body {
+      height: 100%;
+    }
+
+    .md-app {
+      overflow: hidden;
+      height: 100%;
+    }
+
+    .md-app-content {
+      height: unset;
+    }
+
+    .device-list {
+      display : flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+
+    .device-item {      
+      width: 250px;
+    }
+
+    .device-item img {
+      width: 100%;
+      height: 200px;
+    }
+    
+    @media only screen and (max-width: 600px) {
+      .device-item {
+        width: 95%;
+        margin : 5%;
+      }
+
+      .device-item img {
+        width: 100%;
+        height: unset;
+      }
+    }
+
+    
+  </style>
+  <title>IoT Edge Server Monitor</title>
+</head>
+
+<body>
+  <div id="app" class="page-container">
+    <md-app md-mode="fixed">
+      <md-app-toolbar class="md-primary">
+        <span class="md-title">IoT Edge - Local Monitor</span>
+      </md-app-toolbar>
+      <md-app-content>
+        <md-empty-state 
+          v-if="devices.length === 0" 
+          md-icon="devices_other" 
+          md-label="No cameras found." 
+          md-description="Devices are searched via mDNS on the local network.">
+        </md-empty-state>
+        <div class="device-list">          
+            <md-card v-for="device in devices" :key="device.name" class="device-item">
+              <md-card-header>
+                <div class="md-title">{{device.name}}</div>
+                <div class="md-subhead">{{device.updatedString}}</div>
+              </md-card-header>
+
+              <md-card-media>
+                <img :src="device.imageUrl" alt="camera">
+              </md-card-media>
+
+              <md-card-content>
+                <b v-for="c in device.classes">
+                  {{c}}({{device.countClasses[c]}})
+                </b>
+                <b v-if="device.classes.length === 0">
+                  Nothing found.
+                </b>
+              </md-card-content>
+            </md-card>          
+        </div>
+      </md-app-content>
+    </md-app>
+  </div>
+  <script src="https://unpkg.com/vue"></script>
+  <script src="https://unpkg.com/vue-material@beta"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    Vue.use(VueMaterial.default)
+
+    var vm = new Vue({
+      el: '#app',
+      data: {
+        devices: []
+      },
+      watch: {
+        devices: function (newDevices, oldDevices) {          
+          newDevices.forEach(function (device) {
+            device.updated = new Date().getTime()
+            device.updatedString = new Date().toLocaleString()
+            device.imageUrl = 'http://' + device.name + '.local/jpg?uid=' + device.updated
+          })
+        }
+      }
+    })
+
+    var socket = io.connect('http://localhost:3000');
+    socket.on('devices', function (data) {      
+      vm.devices = data
+    });
+  </script>
+</body>
+
+</html>

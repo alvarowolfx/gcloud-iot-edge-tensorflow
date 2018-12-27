@@ -63,6 +63,7 @@ class ImageClassifier {
     } else {
       predictions = await this.model.classify( input )
     }
+    tf.dispose( input )
     return predictions
   }
 }

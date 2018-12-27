@@ -8,9 +8,12 @@
     "@tensorflow-models/mobilenet": "^0.2.2",
     "@tensorflow/tfjs": "^0.14.1",
     "@tensorflow/tfjs-node": "^0.2.1",
+    "abort-controller": "^2.0.0",
+    "express": "^4.16.4",
     "jpeg-js": "^0.3.4",
     "mdns": "^2.4.0",
-    "node-fetch": "^2.3.0"    
+    "node-fetch": "^2.3.0",
+    "socketio": "^1.0.0"
   },
   "devDependencies": {},
   "scripts": {

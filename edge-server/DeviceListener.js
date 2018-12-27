@@ -1,4 +1,5 @@
 const mdns = require( 'mdns' )
+const AbortController = require( 'abort-controller' )
 const fetch = require( 'node-fetch' )
 const jpeg = require( 'jpeg-js' )
 
@@ -21,11 +22,23 @@ class CameraDevice {
   }
 
   async fetchImage() {
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => { controller.abort() },
+      1000,
+    );
+
     const url = this.getImageUrl()    
-    const res = await fetch( url )    
-    const buffer = await res.arrayBuffer()    
-    const image = jpeg.decode( buffer, true )    
-    return image
+    try {
+      const res = await fetch( url, { signal : controller.signal } )    
+      const buffer = await res.arrayBuffer()    
+      const image = jpeg.decode( buffer, true )    
+      return image
+    } catch ( e ) {
+      throw new Error( 'Error Fetching Image' )
+    } finally {
+      clearTimeout( timeout )
+    }
   }
 }
 
