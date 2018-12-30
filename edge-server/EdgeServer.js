@@ -1,33 +1,40 @@
-const mobilenet = require( '@tensorflow-models/mobilenet' )
-const cocossd = require( '@tensorflow-models/coco-ssd' )
 
 const DeviceListener = require( './DeviceListener' )
 const ImageClassifier = require( './ImageClassifier' )
+const CloudIoTCoreGateway = require( './CloudIoTCoreGateway' )
 const WebInterface = require( './WebInterface' )
-const Bag = require( './util/Bag' )
+
 
 class EdgeServer {
   constructor( config ) {
-    if ( config.mode === 'detect' ) {
-      this.classifier = new ImageClassifier( cocossd, config.mode )
-    } else if ( config.mode === 'classify' ) {
-      this.classifier = new ImageClassifier( mobilenet, 'classify' )
-    } else {
-      throw new Error( 'Unknow classifier mode' )
-    }
+    const { classifier, web, gateway } = config
+    
     this.deviceListener = new DeviceListener()
-    this.web = new WebInterface( {
-      port : config.port
-    } )
-    this.config = config
+    this.classifier = new ImageClassifier( classifier )
+    this.gateway = new CloudIoTCoreGateway( gateway )
+    this.web = new WebInterface( web )      
   }
 
   async start() {
+    this.stopped = false
     await this.classifier.load()
     this.deviceListener.start()
     this.web.start()
-    // this.ticker = setInterval( this.run.bind( this ), 10000 )
+    this.gateway.start()
+
+    this.deviceListener.onDeviceAdded( ( deviceId ) => {
+      this.gateway.attachDevice( deviceId )
+      this.gateway.publishDeviceState( deviceId, { status : 'online' } )
+    } )
+
+    this.deviceListener.onDeviceRemoved( ( deviceId ) => {
+      this.gateway.dettachDevice( deviceId )
+      this.gateway.publishDeviceState( deviceId, { status : 'offline' } )
+    } )
+
     this.run()
+    // this.ticker = setInterval( this.run.bind( this ), 10000 )
+    await this.gateway.publishGatewayState( { status : 'online' } )
   }
 
   async run() {
@@ -41,7 +48,7 @@ class EdgeServer {
         // console.time( `ClassifyImage-${device.name}` )
         const predictions = await this.classifier.classifyFromImage( image )
         // console.timeEnd( `ClassifyImage-${device.name}` )
-        const { classes, trackedClasses, countClasses } = this.filterClasses( predictions )        
+        const { classes, trackedClasses, countClasses } = this.classifier.filterClasses( predictions )        
         console.log( 'Found classes', device.name, countClasses )
         if ( trackedClasses.length > 0 ) {
           console.log( 'Found tracking target on device', device.name, trackedClasses )
@@ -59,44 +66,59 @@ class EdgeServer {
       }
     } )
 
-    const results = await Promise.all( promises )
+    // Wait for inference results and filter for valid ones
+    const results = await Promise.all( promises )    
     const filteredResults = results.filter( res => !!res )
+    
+    // Update local web interface
     this.web.broadcastData( 'devices', filteredResults )
-    if ( !this.stoppped ) {
+
+    // Send data to cloud iot core    
+    try {
+      await Promise.all( 
+        results.map( ( res ) => {
+          return this.gateway.publishDeviceTelemetry( res.name, res.countClasses )
+        } )    
+      )
+    } catch ( e ) {
+      console.error( 'Error sending data to cloud iot core', err )
+    }
+    
+    if ( !this.stopped ) {
       setTimeout( this.run.bind( this ), 100 )
     }
   } 
   
-  filterClasses( predictions ) {
-    const trackingSet = new Set( this.config.trackingTags )
-    const all = new Bag()
-    predictions.forEach( ( prediction ) => {          
-      if ( this.config.mode === 'detect' ) {
-        if ( prediction.score >= this.config.threshold ) {
-          all.add( prediction.class )
-        }
-      } else if ( this.config.mode === 'classify' ) { 
-        if ( prediction.probability >= this.config.threshold ) {             
-          prediction.className.split( ', ' ).forEach( all.add )            
-        }
-      }
-          
-    } )
-    const classes = all.toArray()
-    const countClasses = all.toObject()
-    const trackedClasses = classes.filter( x => trackingSet.has( x ) )
-    return { 
-      classes,
-      trackedClasses,
-      countClasses, 
-    }
-  }
+  async stop() {  
+    console.log( '[EdgeServer] Closing...' )
+    this.stopped = true   
+    if ( this.ticker ) {
+      clearInterval( this.ticker )
+    } 
 
-  stop() {
-    this.ticker && this.ticker()
-    this.stopped = true
+    const devices = this.deviceListener.getDevices()
+    
     this.deviceListener.stop()
     this.web.stop()
+
+    console.log( 'Sending offline events' )
+    try {
+      await Promise.all(
+        devices.map( ( device ) => {
+          console.log( 'Sending offline event for device ', device.name )
+          return this.gateway.publishDeviceState( device.name, { status : 'offline' } )
+        } )
+      )
+
+      console.log( 'Sending gateway offline event' )
+      await this.gateway.publishGatewayState( { status : 'offline' } )    
+      console.log( 'All offline events sent' )
+    } catch ( err ) {
+      console.error( 'Error sending data to cloud iot core', err )
+    }
+
+    this.gateway.stop()
+    console.log( '[EdgeServer] Done' )
   }
 }
 

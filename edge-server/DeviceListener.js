@@ -1,3 +1,4 @@
+const EventEmitter = require( 'events' )
 const mdns = require( 'mdns' )
 const AbortController = require( 'abort-controller' )
 const fetch = require( 'node-fetch' )
@@ -22,11 +23,11 @@ class CameraDevice {
   }
 
   async fetchImage() {
-    const controller = new AbortController();
+    const controller = new AbortController()
     const timeout = setTimeout(
       () => { controller.abort() },
       1000,
-    );
+    )
 
     const url = this.getImageUrl()    
     try {
@@ -43,8 +44,9 @@ class CameraDevice {
 }
 
 
-class DeviceListener {
+class DeviceListener extends EventEmitter {
   constructor() {
+    super()
     const sequence = [
       mdns.rst.DNSServiceResolve(),
       'DNSServiceGetAddrInfo' in mdns.dns_sd ? mdns.rst.DNSServiceGetAddrInfo() : mdns.rst.getaddrinfo( { families : [ 0 ] } ),
@@ -60,16 +62,29 @@ class DeviceListener {
       const { name } = service
       console.log( 'service up: ', name )
       this.devices[name] = new CameraDevice( service )
+      this.emit( 'deviceAdded', name )      
     } )
     this.browser.on( 'serviceDown', ( service ) => {
       const { name } = service
       console.log( 'service down: ', name )
       delete this.devices[name]
+      this.emit( 'deviceRemoved', name )
     } )
   }
 
+  onDeviceAdded( callback ) {
+    return this.on( 'deviceAdded', callback )
+  }
+
+  onDeviceRemoved( callback ) {
+    return this.on( 'deviceRemoved', callback )
+  }
+
   stop() {
+    console.log( '[DeviceListener] Closing...' )
     this.browser.stop()
+    this.removeAllListeners()
+    console.log( '[DeviceListener] Done' )
   }
 
   getDevices() {

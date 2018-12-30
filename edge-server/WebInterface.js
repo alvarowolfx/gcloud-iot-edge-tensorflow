@@ -20,7 +20,11 @@ class WebInterface {
   }
 
   stop() {
-    this.server.stop()  
+    console.log( '[WebInterface] Closing...' )
+    this.server.close( () => {
+      console.log( '[WebInterface] Done' )
+    } )
+
   }
 
   indexHandler( req, res ) {
