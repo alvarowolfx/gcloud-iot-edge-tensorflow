@@ -1,9 +1,9 @@
+const { RateLimiter } = require( 'limiter' )
 
 const DeviceListener = require( './DeviceListener' )
 const ImageClassifier = require( './ImageClassifier' )
 const CloudIoTCoreGateway = require( './CloudIoTCoreGateway' )
 const WebInterface = require( './WebInterface' )
-
 
 class EdgeServer {
   constructor( config ) {
@@ -13,6 +13,9 @@ class EdgeServer {
     this.classifier = new ImageClassifier( classifier )
     this.gateway = new CloudIoTCoreGateway( gateway )
     this.web = new WebInterface( web )      
+    this.limiter = new RateLimiter( 2, 'minute' )
+
+    this.deviceQueue = {}
   }
 
   async start() {
@@ -32,9 +35,56 @@ class EdgeServer {
       this.gateway.publishDeviceState( deviceId, { status : 'offline' } )
     } )
 
-    this.run()
+    this.run()    
     // this.ticker = setInterval( this.run.bind( this ), 10000 )
+    
     await this.gateway.publishGatewayState( { status : 'online' } )
+  }
+
+  hasData() {
+    return Object.keys( this.deviceQueue ).length > 0 
+  }
+
+  queueData( device, { classes, trackedClasses, countClasses } ) { 
+    if ( classes.length === 0 ) {
+      return
+    }       
+
+    const { name } = device
+    const deviceData = this.deviceQueue[name]
+    if ( !deviceData ) {
+      this.deviceQueue[name] = {
+        name,
+        classes, 
+        trackedClasses,
+        countClasses
+      }      
+    } else {      
+      const classesSet = new Set( deviceData.classes.concat( classes ) )
+      const nClasses = [ ...classesSet ]
+
+      const trackedClassesSet = new Set( deviceData.trackedClasses.concat( trackedClasses ) )
+      const nTrackedClasses = [ ...trackedClassesSet ]
+
+      const nCountClasses = {
+        ...deviceData.countClasses,
+        ...countClasses
+      }
+      Object.keys( nCountClasses ).forEach( ( key ) => {
+        nCountClasses[key] = Math.max( deviceData.countClasses[key], countClasses[key] )
+      } )
+
+      this.deviceQueue[name] = {
+        name,
+        classes : nClasses, 
+        trackedClasses : nTrackedClasses,
+        countClasses : nCountClasses
+      }  
+    }
+  }
+
+  clearQueue() {
+    this.deviceQueue = {}
   }
 
   async run() {
@@ -45,42 +95,44 @@ class EdgeServer {
         const image = await device.fetchImage()        
         console.log( 'Fetched image from ', device.name )
         // console.timeEnd( `FetchImage-${device.name}` )
+        
         // console.time( `ClassifyImage-${device.name}` )
         const predictions = await this.classifier.classifyFromImage( image )
         // console.timeEnd( `ClassifyImage-${device.name}` )
-        const { classes, trackedClasses, countClasses } = this.classifier.filterClasses( predictions )        
+        
+        const result = this.classifier.filterClasses( predictions )
+        const { countClasses } = result
         console.log( 'Found classes', device.name, countClasses )
-        if ( trackedClasses.length > 0 ) {
-          console.log( 'Found tracking target on device', device.name, trackedClasses )
-          // Do something with data
-        }
-        return {
-          name : device.name,
-          trackedClasses,
-          countClasses,
-          classes
-        }
+        
+        this.queueData( device, result )
       } catch ( e ) {
-        console.error( 'Error fetching image from device', device.name, e.message )  
-        return null
+        console.error( 'Error fetching image from device', device.name, e.message )          
       }
     } )
 
     // Wait for inference results and filter for valid ones
-    const results = await Promise.all( promises )    
-    const filteredResults = results.filter( res => !!res )
+    await Promise.all( promises )    
     
     // Update local web interface
-    this.web.broadcastData( 'devices', filteredResults )
+    this.web.broadcastData( 'devices', Object.values( this.deviceQueue ) )
 
     // Send data to cloud iot core    
     try {
-      await Promise.all( 
-        results.map( ( res ) => {
-          return this.gateway.publishDeviceTelemetry( res.name, res.countClasses )
-        } )    
-      )
-    } catch ( e ) {
+      if ( this.hasData() ) {
+        if ( this.limiter.tryRemoveTokens( 1 ) ) {        
+          console.log( '[PublishData] Sending data to cloud iot core.' )
+          await Promise.all( 
+            Object.keys( this.deviceQueue ).map( ( deviceId ) => {
+              const res = this.deviceQueue[deviceId]
+              return this.gateway.publishDeviceTelemetry( deviceId, res.countClasses )
+            } )    
+          )
+          this.clearQueue()
+        } else {
+          console.log( '[PublishData] Publishing throttled.' )
+        }
+      }
+    } catch ( err ) {
       console.error( 'Error sending data to cloud iot core', err )
     }
     
