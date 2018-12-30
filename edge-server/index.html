@@ -77,10 +77,10 @@
               </md-card-media>
 
               <md-card-content>
-                <b v-for="c in device.classes">
+                <b v-for="c in (device.classes || [])">
                   {{c}}({{device.countClasses[c]}})
                 </b>
-                <b v-if="device.classes.length === 0">
+                <b v-if="(device.classes || []).length === 0">
                   Nothing found.
                 </b>
               </md-card-content>

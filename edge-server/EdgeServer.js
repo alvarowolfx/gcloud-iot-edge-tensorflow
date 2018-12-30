@@ -5,6 +5,10 @@ const ImageClassifier = require( './ImageClassifier' )
 const CloudIoTCoreGateway = require( './CloudIoTCoreGateway' )
 const WebInterface = require( './WebInterface' )
 
+const createLogger = require( './Log' )
+
+const logger = createLogger( 'EdgeServer' )
+
 class EdgeServer {
   constructor( config ) {
     const { classifier, web, gateway } = config
@@ -90,23 +94,24 @@ class EdgeServer {
   async run() {
     const devices = this.deviceListener.getDevices()
     const promises = devices.map( async ( device ) => {
-      console.log( 'Looking for image from ', device.name )
+      logger.info( `Looking for image from ${device.name}` )
       try {
+        logger.profile( `FetchImage-${device.name}` )
         const image = await device.fetchImage()        
-        console.log( 'Fetched image from ', device.name )
-        // console.timeEnd( `FetchImage-${device.name}` )
-        
-        // console.time( `ClassifyImage-${device.name}` )
+        logger.info( `Fetched image from ${device.name}` )        
+        logger.profile( `FetchImage-${device.name}` )        
+                
+        logger.profile( `ClassifyImage-${device.name}` )
         const predictions = await this.classifier.classifyFromImage( image )
-        // console.timeEnd( `ClassifyImage-${device.name}` )
+        logger.profile( `ClassifyImage-${device.name}` )
         
         const result = this.classifier.filterClasses( predictions )
         const { countClasses } = result
-        console.log( 'Found classes', device.name, countClasses )
+        logger.info( `Found classes ${device.name} - ${JSON.stringify( countClasses )}` )
         
         this.queueData( device, result )
       } catch ( e ) {
-        console.error( 'Error fetching image from device', device.name, e.message )          
+        logger.error( 'Error fetching image from device', device.name, e.message )          
       }
     } )
 
@@ -114,13 +119,19 @@ class EdgeServer {
     await Promise.all( promises )    
     
     // Update local web interface
-    this.web.broadcastData( 'devices', Object.values( this.deviceQueue ) )
+    const deviceData = Object.values( this.deviceQueue )  
+    const deviceIds = devices.map( device => device.name )  
+    const data = deviceIds.map( name => ( {
+      name,
+      ...( deviceData[name] || { } )
+    } ) )
+    this.web.broadcastData( 'devices', data )
 
     // Send data to cloud iot core    
     try {
       if ( this.hasData() ) {
         if ( this.limiter.tryRemoveTokens( 1 ) ) {        
-          console.log( '[PublishData] Sending data to cloud iot core.' )
+          logger.info( '[PublishData] Sending data to cloud iot core.' )
           await Promise.all( 
             Object.keys( this.deviceQueue ).map( ( deviceId ) => {
               const res = this.deviceQueue[deviceId]
@@ -129,11 +140,11 @@ class EdgeServer {
           )
           this.clearQueue()
         } else {
-          console.log( '[PublishData] Publishing throttled.' )
+          logger.info( '[PublishData] Publishing throttled.' )
         }
       }
     } catch ( err ) {
-      console.error( 'Error sending data to cloud iot core', err )
+      logger.error( `Error sending data to cloud iot core ${err}`, err )
     }
     
     if ( !this.stopped ) {
@@ -142,7 +153,7 @@ class EdgeServer {
   } 
   
   async stop() {  
-    console.log( '[EdgeServer] Closing...' )
+    logger.info( 'Closing...' )
     this.stopped = true   
     if ( this.ticker ) {
       clearInterval( this.ticker )
@@ -153,24 +164,23 @@ class EdgeServer {
     this.deviceListener.stop()
     this.web.stop()
 
-    console.log( 'Sending offline events' )
+    logger.info( 'Sending offline events' )
     try {
       await Promise.all(
         devices.map( ( device ) => {
-          console.log( 'Sending offline event for device ', device.name )
+          logger.info( `Sending offline event for device ${device.name}` )
           return this.gateway.publishDeviceState( device.name, { status : 'offline' } )
         } )
       )
-
-      console.log( 'Sending gateway offline event' )
+      logger.info( 'Sending gateway offline event' )
       await this.gateway.publishGatewayState( { status : 'offline' } )    
-      console.log( 'All offline events sent' )
+      logger.info( 'All offline events sent' )
     } catch ( err ) {
-      console.error( 'Error sending data to cloud iot core', err )
+      logger.error( `Error sending data to cloud iot core ${err}`, err )
     }
 
     this.gateway.stop()
-    console.log( '[EdgeServer] Done' )
+    logger.info( 'Done' )
   }
 }
 

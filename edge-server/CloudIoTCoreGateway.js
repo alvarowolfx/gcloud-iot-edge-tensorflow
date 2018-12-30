@@ -2,6 +2,10 @@ const fs = require( 'fs' )
 const jwt = require( 'jsonwebtoken' )
 const mqtt = require( 'async-mqtt' )
 
+const createLogger = require( './Log' )
+
+const logger = createLogger( 'CloudIoTCoreGateway' )
+
 class CloudIoTCoreGateway {
   constructor( { projectId, cloudRegion, registryId, gatewayId, privateKeyFile } ) {          
     this.projectId = projectId
@@ -19,14 +23,14 @@ class CloudIoTCoreGateway {
   }
 
   stop() {
-    console.log( '[CloudIoTCoreGateway] Closing...' )    
+    logger.info( 'Closing...' )    
     if ( this.client ) {
       this.client.end()
     }
     if ( this.connectionTicker ) { 
       clearInterval( this.connectionTicker )
     }
-    console.log( '[CloudIoTCoreGateway] Done' )
+    logger.info( ' Done' )
   }
   
   connect() {
@@ -57,7 +61,7 @@ class CloudIoTCoreGateway {
   checkConnection() {
     const secsFromIssue = parseInt( Date.now() / 1000 ) - this.iatTime
     if ( secsFromIssue > this.tokenExpMins * 60 ) {      
-      console.log( `\tRefreshing token after ${secsFromIssue} seconds.` )
+      logger.info( `\tRefreshing token after ${secsFromIssue} seconds.` )
       this.connect()
     }
   }

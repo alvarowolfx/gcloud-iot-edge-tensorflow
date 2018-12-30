@@ -4,6 +4,10 @@ const AbortController = require( 'abort-controller' )
 const fetch = require( 'node-fetch' )
 const jpeg = require( 'jpeg-js' )
 
+const createLogger = require( './Log' )
+
+const logger = createLogger( 'DeviceListener' )
+
 class CameraDevice {
   constructor( service ) {
     this.name = service.name
@@ -60,13 +64,13 @@ class DeviceListener extends EventEmitter {
     this.browser.start()
     this.browser.on( 'serviceUp', ( service ) => {
       const { name } = service
-      console.log( 'service up: ', name )
+      logger.info( `service up: ${name}` )
       this.devices[name] = new CameraDevice( service )
       this.emit( 'deviceAdded', name )      
     } )
     this.browser.on( 'serviceDown', ( service ) => {
       const { name } = service
-      console.log( 'service down: ', name )
+      logger.info( `service down: ${name}` )
       delete this.devices[name]
       this.emit( 'deviceRemoved', name )
     } )
@@ -81,10 +85,10 @@ class DeviceListener extends EventEmitter {
   }
 
   stop() {
-    console.log( '[DeviceListener] Closing...' )
+    logger.info( 'Closing...' )
     this.browser.stop()
     this.removeAllListeners()
-    console.log( '[DeviceListener] Done' )
+    logger.info( 'Done' )
   }
 
   getDevices() {

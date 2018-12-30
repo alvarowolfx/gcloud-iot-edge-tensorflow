@@ -2,6 +2,9 @@ const express = require( 'express' )
 const { Server } = require( 'http' )
 const SocketIO = require( 'socket.io' )
 
+const createLogger = require( './Log' )
+
+const logger = createLogger( 'WebInterface' )
 
 class WebInterface {
   constructor( { port } ) {
@@ -20,9 +23,9 @@ class WebInterface {
   }
 
   stop() {
-    console.log( '[WebInterface] Closing...' )
+    logger.info( 'Closing...' )
     this.server.close( () => {
-      console.log( '[WebInterface] Done' )
+      logger.info( 'Done' )
     } )
 
   }
