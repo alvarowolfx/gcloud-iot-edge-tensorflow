@@ -3,7 +3,8 @@
 export LOCATION="us-central1"
 export GATEWAY_ID="gw-mark-one"
 export REGISTRY="iot-edge-registry"
-export PUBSUB_TOPIC="telemetry"
+export PUBSUB_TOPIC_EVENTS="telemetry"
+export PUBSUB_TOPIC_STATE="state"
 
 if [ -z "$GCLOUD_PROJECT" ]; then  
   printf "\nOnce you've logged into your project, enter the project id below."
