@@ -18,7 +18,7 @@
     "mdns": "^2.4.0",
     "mqtt": "^2.18.8",
     "node-fetch": "^2.3.0",
-    "socketio": "^1.0.0",
+    "socket.io": "^2.2.0",
     "winston": "^3.1.0"
   },
   "devDependencies": {},
