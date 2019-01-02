@@ -34,12 +34,7 @@
 #include "bitmap.h"
 #include "http_server.h"
 #include "led.h"
-#include "qr_recoginize.h"
-static void handle_grayscale_pgm(http_context_t http_ctx, void* ctx);
-static void handle_rgb_bmp(http_context_t http_ctx, void* ctx);
-static void handle_rgb_bmp_stream(http_context_t http_ctx, void* ctx);
 static void handle_jpg(http_context_t http_ctx, void* ctx);
-static void handle_jpg_stream(http_context_t http_ctx, void* ctx);
 static esp_err_t event_handler(void *ctx, system_event_t *event);
 static void initialise_wifi(void);
 static void start_mdns_service(void);
@@ -131,21 +126,9 @@ void app_main()
     http_server_options_t http_options = HTTP_SERVER_OPTIONS_DEFAULT();    
     ESP_ERROR_CHECK( http_server_start(&http_options, &server) );
 
-    if (s_pixel_format == CAMERA_PF_GRAYSCALE) {
-        ESP_ERROR_CHECK( http_register_handler(server, "/pgm", HTTP_GET, HTTP_HANDLE_RESPONSE, &handle_grayscale_pgm, &camera_config) );
-        ESP_LOGI(TAG, "Open http://" IPSTR "/pgm for a single image/x-portable-graymap image", IP2STR(&s_ip_addr));
-    }
-    if (s_pixel_format == CAMERA_PF_RGB565) {
-        ESP_ERROR_CHECK( http_register_handler(server, "/bmp", HTTP_GET, HTTP_HANDLE_RESPONSE, &handle_rgb_bmp, NULL) );
-        ESP_LOGI(TAG, "Open http://" IPSTR "/bmp for single image/bitmap image", IP2STR(&s_ip_addr));
-        ESP_ERROR_CHECK( http_register_handler(server, "/bmp_stream", HTTP_GET, HTTP_HANDLE_RESPONSE, &handle_rgb_bmp_stream, NULL) );
-        ESP_LOGI(TAG, "Open http://" IPSTR "/bmp_stream for multipart/x-mixed-replace stream of bitmaps", IP2STR(&s_ip_addr));
-    }
     if (s_pixel_format == CAMERA_PF_JPEG) {
         ESP_ERROR_CHECK( http_register_handler(server, "/jpg", HTTP_GET, HTTP_HANDLE_RESPONSE, &handle_jpg, NULL) );
-        ESP_LOGI(TAG, "Open http://" IPSTR "/jpg for single image/jpg image", IP2STR(&s_ip_addr));
-        ESP_ERROR_CHECK( http_register_handler(server, "/jpg_stream", HTTP_GET, HTTP_HANDLE_RESPONSE, &handle_jpg_stream, NULL) );
-        ESP_LOGI(TAG, "Open http://" IPSTR "/jpg_stream for multipart/x-mixed-replace stream of JPEGs", IP2STR(&s_ip_addr));
+        ESP_LOGI(TAG, "Open http://" IPSTR "/jpg for single image/jpg image", IP2STR(&s_ip_addr));        
     }
     ESP_LOGI(TAG, "Free heap: %u", xPortGetFreeHeapSize());
     ESP_LOGI(TAG, "Camera demo ready");
@@ -160,62 +143,6 @@ static esp_err_t write_frame(http_context_t http_ctx)
             .data_is_persistent = true
     };
     return http_response_write(http_ctx, &fb_data);
-}
-
-static void handle_grayscale_pgm(http_context_t http_ctx, void* ctx)
-{
-    esp_err_t err = camera_run();
-    if (err != ESP_OK) {
-        ESP_LOGD(TAG, "Camera capture failed with error = %d", err);
-        return;
-    }
-    char* pgm_header_str;
-    asprintf(&pgm_header_str, "P5 %d %d %d\n",
-            camera_get_fb_width(), camera_get_fb_height(), 255);
-    if (pgm_header_str == NULL) {
-        return;
-    }
-
-    size_t response_size = strlen(pgm_header_str) + camera_get_data_size();
-    http_response_begin(http_ctx, 200, "image/x-portable-graymap", response_size);
-    http_response_set_header(http_ctx, "Content-disposition", "inline; filename=capture.pgm");
-    http_buffer_t pgm_header = { .data = pgm_header_str };
-    http_response_write(http_ctx, &pgm_header);
-    free(pgm_header_str);
-
-    write_frame(http_ctx);
-    http_response_end(http_ctx);
-    ESP_LOGI(TAG, "Free heap: %u", xPortGetFreeHeapSize());
-#if CONFIG_QR_RECOGNIZE
-    camera_config_t *camera_config = ctx;
-    xTaskCreate(qr_recoginze, "qr_recoginze", 111500, camera_config, 5, NULL);
-#endif
-}
-
-static void handle_rgb_bmp(http_context_t http_ctx, void* ctx)
-{
-    esp_err_t err = camera_run();
-    if (err != ESP_OK) {
-        ESP_LOGD(TAG, "Camera capture failed with error = %d", err);
-        return;
-    }
-
-    bitmap_header_t* header = bmp_create_header(camera_get_fb_width(), camera_get_fb_height());
-    if (header == NULL) {
-        return;
-    }
-
-    http_response_begin(http_ctx, 200, "image/bmp", sizeof(*header) + camera_get_data_size());
-    http_buffer_t bmp_header = {
-            .data = header,
-            .size = sizeof(*header)
-    };
-    http_response_set_header(http_ctx, "Content-disposition", "inline; filename=capture.bmp");
-    http_response_write(http_ctx, &bmp_header);
-    free(header);
-
-    write_frame(http_ctx);
-    http_response_end(http_ctx);
 }
 
 static void handle_jpg(http_context_t http_ctx, void* ctx)
@@ -234,80 +161,6 @@ static void handle_jpg(http_context_t http_ctx, void* ctx)
   http_response_end(http_ctx);
   // led_close();
 }
-
-
-static void handle_rgb_bmp_stream(http_context_t http_ctx, void* ctx)
-{
-    http_response_begin(http_ctx, 200, STREAM_CONTENT_TYPE, HTTP_RESPONSE_SIZE_UNKNOWN);
-    bitmap_header_t* header = bmp_create_header(camera_get_fb_width(), camera_get_fb_height());
-    if (header == NULL) {
-        return;
-    }
-    http_buffer_t bmp_header = {
-            .data = header,
-            .size = sizeof(*header)
-    };
-
-
-    while (true) {
-        esp_err_t err = camera_run();
-        if (err != ESP_OK) {
-            ESP_LOGD(TAG, "Camera capture failed with error = %d", err);
-            return;
-        }
-
-        err = http_response_begin_multipart(http_ctx, "image/bitmap",
-                camera_get_data_size() + sizeof(*header));
-        if (err != ESP_OK) {
-            break;
-        }
-        err = http_response_write(http_ctx, &bmp_header);
-        if (err != ESP_OK) {
-            break;
-        }
-        err = write_frame(http_ctx);
-        if (err != ESP_OK) {
-            break;
-        }
-        err = http_response_end_multipart(http_ctx, STREAM_BOUNDARY);
-        if (err != ESP_OK) {
-            break;
-        }
-    }
-
-    free(header);
-    http_response_end(http_ctx);
-}
-
-static void handle_jpg_stream(http_context_t http_ctx, void* ctx)
-{
-    http_response_begin(http_ctx, 200, STREAM_CONTENT_TYPE, HTTP_RESPONSE_SIZE_UNKNOWN);
-    if(get_light_state())
-    		led_open();
-    while (true) {
-        esp_err_t err = camera_run();
-        if (err != ESP_OK) {
-            ESP_LOGD(TAG, "Camera capture failed with error = %d", err);
-            return;
-        }
-        err = http_response_begin_multipart(http_ctx, "image/jpg",
-                camera_get_data_size());
-        if (err != ESP_OK) {
-            break;
-        }
-        err = write_frame(http_ctx);
-        if (err != ESP_OK) {
-            break;
-        }
-        err = http_response_end_multipart(http_ctx, STREAM_BOUNDARY);
-        if (err != ESP_OK) {
-            break;
-        }
-    }
-    http_response_end(http_ctx);
-    led_close();
-}
-
 
 static esp_err_t event_handler(void *ctx, system_event_t *event)
 {
