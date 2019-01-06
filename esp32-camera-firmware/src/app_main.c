@@ -22,37 +22,34 @@
 #include "freertos/semphr.h"
 #include "freertos/event_groups.h"
 
+#include "esp_camera.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "mdns.h"
 #include "esp_event_loop.h"
 #include "esp_log.h"
 #include "esp_err.h"
+#include "esp_http_server.h"
 #include "nvs_flash.h"
 #include "driver/gpio.h"
-#include "camera.h"
-#include "bitmap.h"
-#include "http_server.h"
-#include "led.h"
-static void handle_jpg(http_context_t http_ctx, void* ctx);
+
+static esp_err_t jpg_http_handler(httpd_req_t *req);
 static esp_err_t event_handler(void *ctx, system_event_t *event);
 static void initialise_wifi(void);
 static void start_mdns_service(void);
 
 static const char* TAG = "camera_demo";
 
-static const char* STREAM_CONTENT_TYPE =
-        "multipart/x-mixed-replace; boundary=123456789000000000000987654321";
-
-static const char* STREAM_BOUNDARY = "--123456789000000000000987654321";
-
 EventGroupHandle_t s_wifi_event_group;
 static const int CONNECTED_BIT = BIT0;
 static ip4_addr_t s_ip_addr;
-static camera_pixelformat_t s_pixel_format;
 
 #define CAMERA_PIXEL_FORMAT CAMERA_PF_JPEG
-#define CAMERA_FRAME_SIZE CAMERA_FS_SVGA
+#if CONFIG_MODEL == CONFIG_MODEL_ESP32CAM
+#define CAMERA_FRAME_SIZE FRAMESIZE_UXGA // Full 2MP
+#else
+#define CAMERA_FRAME_SIZE FRAMESIZE_SVGA // No PSRAM 
+#endif
 
 void app_main()
 {     
@@ -66,8 +63,12 @@ void app_main()
     }
 
     camera_config_t camera_config = {
-        .ledc_channel = LEDC_CHANNEL_0,
-        .ledc_timer = LEDC_TIMER_0,
+        .pin_reset = CONFIG_RESET,
+        .pin_pwdn = CONFIG_PWDN,
+        .pin_xclk = CONFIG_XCLK,
+        .pin_sscb_sda = CONFIG_SDA,
+        .pin_sscb_scl = CONFIG_SCL,
+
         .pin_d0 = CONFIG_D0,
         .pin_d1 = CONFIG_D1,
         .pin_d2 = CONFIG_D2,
@@ -76,43 +77,21 @@ void app_main()
         .pin_d5 = CONFIG_D5,
         .pin_d6 = CONFIG_D6,
         .pin_d7 = CONFIG_D7,
-        .pin_xclk = CONFIG_XCLK,
-        .pin_pclk = CONFIG_PCLK,
         .pin_vsync = CONFIG_VSYNC,
         .pin_href = CONFIG_HREF,
-        .pin_sscb_sda = CONFIG_SDA,
-        .pin_sscb_scl = CONFIG_SCL,
-        .pin_reset = CONFIG_RESET,
+        .pin_pclk = CONFIG_PCLK,                        
+        
         .xclk_freq_hz = CONFIG_XCLK_FREQ,
+        .ledc_channel = LEDC_CHANNEL_0,
+        .ledc_timer = LEDC_TIMER_0,
+
+        .pixel_format = PIXFORMAT_JPEG,
+        .frame_size = CAMERA_FRAME_SIZE,
+        .jpeg_quality = 12,
+        .fb_count = 1
     };
-
-    camera_model_t camera_model;
-    err = camera_probe(&camera_config, &camera_model);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Camera probe failed with error 0x%x", err);
-        return;
-    }
-
-    if (camera_model == CAMERA_OV7725) {
-        s_pixel_format = CAMERA_PIXEL_FORMAT;
-        camera_config.frame_size = CAMERA_FRAME_SIZE;
-        ESP_LOGI(TAG, "Detected OV7725 camera, using %s bitmap format",
-                CAMERA_PIXEL_FORMAT == CAMERA_PF_GRAYSCALE ?
-                        "grayscale" : "RGB565");
-    } else if (camera_model == CAMERA_OV2640) {
-        ESP_LOGI(TAG, "Detected OV2640 camera, using JPEG format");
-        s_pixel_format = CAMERA_PIXEL_FORMAT;
-        camera_config.frame_size = CAMERA_FRAME_SIZE;
-        if (s_pixel_format == CAMERA_PF_JPEG){
-          camera_config.jpeg_quality = 15;
-        }
-    } else {
-        ESP_LOGE(TAG, "Camera not supported");
-        return;
-    }
-
-    camera_config.pixel_format = s_pixel_format;
-    err = camera_init(&camera_config);
+    
+    err = esp_camera_init(&camera_config);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Camera init failed with error 0x%x", err);
         return;
@@ -121,45 +100,73 @@ void app_main()
     initialise_wifi();
 
     start_mdns_service();
+    
+    httpd_handle_t server = NULL;
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    ESP_ERROR_CHECK( httpd_start(&server, &config) );     
 
-    http_server_t server;
-    http_server_options_t http_options = HTTP_SERVER_OPTIONS_DEFAULT();    
-    ESP_ERROR_CHECK( http_server_start(&http_options, &server) );
+    httpd_uri_t jpg_uri = {
+      .uri      = "/jpg",
+      .method   = HTTP_GET,
+      .handler  = jpg_http_handler,
+      .user_ctx = NULL
+    };
 
-    if (s_pixel_format == CAMERA_PF_JPEG) {
-        ESP_ERROR_CHECK( http_register_handler(server, "/jpg", HTTP_GET, HTTP_HANDLE_RESPONSE, &handle_jpg, NULL) );
-        ESP_LOGI(TAG, "Open http://" IPSTR "/jpg for single image/jpg image", IP2STR(&s_ip_addr));        
-    }
+    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &jpg_uri));    
+    ESP_LOGI(TAG, "Open http://" IPSTR "/jpg for single image/jpg image", IP2STR(&s_ip_addr));    
     ESP_LOGI(TAG, "Free heap: %u", xPortGetFreeHeapSize());
     ESP_LOGI(TAG, "Camera demo ready");
-
 }
 
-static esp_err_t write_frame(http_context_t http_ctx)
-{
-    http_buffer_t fb_data = {
-            .data = camera_get_fb(),
-            .size = camera_get_data_size(),
-            .data_is_persistent = true
-    };
-    return http_response_write(http_ctx, &fb_data);
+typedef struct {
+        httpd_req_t *req;
+        size_t len;
+} jpg_chunking_t;
+
+static size_t jpg_encode_stream(void * arg, size_t index, const void* data, size_t len){
+    jpg_chunking_t *j = (jpg_chunking_t *)arg;
+    if(!index){
+        j->len = 0;
+    }
+    if(httpd_resp_send_chunk(j->req, (const char *)data, len) != ESP_OK){
+        return 0;
+    }
+    j->len += len;
+    return len;
 }
 
-static void handle_jpg(http_context_t http_ctx, void* ctx)
-{
-	//if(get_light_state())
-		// led_open();
-  esp_err_t err = camera_run();
-  if (err != ESP_OK) {
-      ESP_LOGD(TAG, "Camera capture failed with error = %d", err);
-      return;
-  }
+esp_err_t jpg_http_handler(httpd_req_t *req){
+    camera_fb_t * fb = NULL;
+    esp_err_t res = ESP_OK;
+    size_t fb_len = 0;
+    int64_t fr_start = esp_timer_get_time();
 
-  http_response_begin(http_ctx, 200, "image/jpeg", camera_get_data_size());
-  http_response_set_header(http_ctx, "Content-disposition", "inline; filename=capture.jpg");
-  write_frame(http_ctx);
-  http_response_end(http_ctx);
-  // led_close();
+    fb = esp_camera_fb_get();
+    if (!fb) {
+        ESP_LOGE(TAG, "Camera capture failed");
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    res = httpd_resp_set_type(req, "image/jpeg");
+    if(res == ESP_OK){
+        res = httpd_resp_set_hdr(req, "Content-Disposition", "inline; filename=capture.jpg");
+    }
+
+    if(res == ESP_OK){
+        if(fb->format == PIXFORMAT_JPEG){
+            fb_len = fb->len;
+            res = httpd_resp_send(req, (const char *)fb->buf, fb->len);
+        } else {
+            jpg_chunking_t jchunk = {req, 0};
+            res = frame2jpg_cb(fb, 80, jpg_encode_stream, &jchunk)?ESP_OK:ESP_FAIL;
+            httpd_resp_send_chunk(req, NULL, 0);
+            fb_len = jchunk.len;
+        }
+    }
+    esp_camera_fb_return(fb);
+    int64_t fr_end = esp_timer_get_time();
+    ESP_LOGI(TAG, "JPG: %uKB %ums", (uint32_t)(fb_len/1024), (uint32_t)((fr_end - fr_start)/1000));
+    return res;
 }
 
 static esp_err_t event_handler(void *ctx, system_event_t *event)
