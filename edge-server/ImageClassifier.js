@@ -83,7 +83,7 @@ class ImageClassifier {
     } )
   }
 
-  filterClasses( predictions ) {
+  groupClasses( predictions ) {
     const trackingSet = new Set( this.trackingTags )
     const all = new Bag()
     predictions.forEach( ( prediction ) => {                

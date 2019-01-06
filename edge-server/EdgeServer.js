@@ -105,11 +105,11 @@ class EdgeServer {
         const predictions = await this.classifier.classifyFromImage( image )
         logger.profile( `ClassifyImage-${device.name}` )
         
-        const result = this.classifier.filterClasses( predictions )
-        const { countClasses } = result
+        const grouped = this.classifier.groupClasses( predictions )
+        const { countClasses } = grouped
         logger.info( `Found classes ${device.name} - ${JSON.stringify( countClasses )}` )
         
-        this.queueData( device, result )
+        this.queueData( device, grouped )
       } catch ( e ) {
         logger.error( 'Error fetching image from device', device.name, e.message )          
       }
