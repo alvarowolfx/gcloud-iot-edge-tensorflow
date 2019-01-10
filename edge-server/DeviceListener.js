@@ -30,7 +30,7 @@ class CameraDevice {
     const controller = new AbortController()
     const timeout = setTimeout(
       () => { controller.abort() },
-      1000,
+      5000,
     )
 
     const url = this.getImageUrl()    
@@ -66,7 +66,7 @@ class DeviceListener extends EventEmitter {
       const { name } = service
       logger.info( `service up: ${name}` )
       this.devices[name] = new CameraDevice( service )
-      this.emit( 'deviceAdded', name )      
+      this.emit( 'deviceAdded', name )            
     } )
     this.browser.on( 'serviceDown', ( service ) => {
       const { name } = service

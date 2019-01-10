@@ -13,6 +13,7 @@ function create( customLabel ) {
       timestamp(),
       appFormat
     ),
+    exitOnError : false,    
     transports : [    
       new transports.File( { filename : 'error.log', level : 'error' } ),
       new transports.File( { filename : 'combined.log' } )

@@ -29,13 +29,13 @@ class EdgeServer {
     this.web.start()
     this.gateway.start()
 
-    this.deviceListener.onDeviceAdded( ( deviceId ) => {
+    this.deviceListener.onDeviceAdded( ( deviceId ) => {      
       this.gateway.attachDevice( deviceId )
       this.gateway.publishDeviceState( deviceId, { status : 'online' } )
     } )
 
-    this.deviceListener.onDeviceRemoved( ( deviceId ) => {
-      this.gateway.dettachDevice( deviceId )
+    this.deviceListener.onDeviceRemoved( ( deviceId ) => {      
+      this.gateway.detachDevice( deviceId )
       this.gateway.publishDeviceState( deviceId, { status : 'offline' } )
     } )
 
@@ -75,7 +75,7 @@ class EdgeServer {
         ...countClasses
       }
       Object.keys( nCountClasses ).forEach( ( key ) => {
-        nCountClasses[key] = Math.max( deviceData.countClasses[key], countClasses[key] )
+        nCountClasses[key] = Math.max( deviceData.countClasses[key], countClasses[key] ) || 1
       } )
 
       this.deviceQueue[name] = {
@@ -116,35 +116,35 @@ class EdgeServer {
     } )
 
     // Wait for inference results and filter for valid ones
-    await Promise.all( promises )    
+    try {
+      await Promise.all( promises )    
+    } catch ( e ) {
+      logger.error( 'Error running inference on some devices', e.message )
+    }
     
     // Update local web interface
-    const deviceData = Object.values( this.deviceQueue )  
-    const deviceIds = devices.map( device => device.name )  
-    const data = deviceIds.map( name => ( {
-      name,
-      ...( deviceData[name] || { } )
-    } ) )
-    this.web.broadcastData( 'devices', data )
+    logger.info( `Device queue : ${JSON.stringify( this.deviceQueue )}` )
+    const deviceData = Object.values( this.deviceQueue )      
+    this.web.broadcastData( 'devices', deviceData )
 
     // Send data to cloud iot core    
     try {
       if ( this.hasData() ) {
         if ( this.limiter.tryRemoveTokens( 1 ) ) {        
           logger.info( '[PublishData] Sending data to cloud iot core.' )
-          await Promise.all( 
-            Object.keys( this.deviceQueue ).map( ( deviceId ) => {
-              const res = this.deviceQueue[deviceId]
-              return this.gateway.publishDeviceTelemetry( deviceId, res.countClasses )
-            } )    
-          )
-          this.clearQueue()
+          const publishPromises = Object.keys( this.deviceQueue ).map( ( deviceId ) => {
+            const res = this.deviceQueue[deviceId]
+            return this.gateway.publishDeviceTelemetry( deviceId, res.countClasses )
+          } )    
+          logger.info( `Promises ${publishPromises}` )
+          this.clearQueue()                    
+          await Promise.all( publishPromises )
         } else {
           logger.info( '[PublishData] Publishing throttled.' )
         }
       }
     } catch ( err ) {
-      logger.error( `Error sending data to cloud iot core ${err}`, err )
+      logger.error( `Error sending data to cloud iot core ${err}`, err )      
     }
     
     if ( !this.stopped ) {
@@ -155,7 +155,7 @@ class EdgeServer {
   async stop() {  
     logger.info( 'Closing...' )
     this.stopped = true   
-    if ( this.ticker ) {
+    if ( this.ticker ) {      
       clearInterval( this.ticker )
     } 
 
@@ -166,12 +166,11 @@ class EdgeServer {
 
     logger.info( 'Sending offline events' )
     try {
-      await Promise.all(
-        devices.map( ( device ) => {
-          logger.info( `Sending offline event for device ${device.name}` )
-          return this.gateway.publishDeviceState( device.name, { status : 'offline' } )
-        } )
-      )
+      const publishPromises = devices.map( ( device ) => {
+        logger.info( `Sending offline event for device ${device.name}` )
+        return this.gateway.publishDeviceState( device.name, { status : 'offline' } )
+      } )      
+      await Promise.all( publishPromises )
       logger.info( 'Sending gateway offline event' )
       await this.gateway.publishGatewayState( { status : 'offline' } )    
       logger.info( 'All offline events sent' )

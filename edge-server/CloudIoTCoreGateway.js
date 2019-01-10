@@ -30,7 +30,7 @@ class CloudIoTCoreGateway {
     if ( this.connectionTicker ) { 
       clearInterval( this.connectionTicker )
     }
-    logger.info( ' Done' )
+    logger.info( 'Done' )
   }
   
   connect() {
@@ -81,9 +81,14 @@ class CloudIoTCoreGateway {
     return jwt.sign( token, privateKey, { algorithm } )
   }
 
-  publish( deviceId, payload, eventType ) {
+  async publish( deviceId, payload, eventType ) {
+    let finalPayload = payload
+    if ( payload instanceof Object ) {
+      finalPayload = JSON.stringify( payload )
+    }
+
     const mqttTopic = `/devices/${deviceId}/${eventType}`
-    return this.client.publish( mqttTopic, JSON.stringify( payload ), { qos : 1 } )
+    return this.client.publish( mqttTopic, finalPayload, { qos : 0 } )
   }
 
   attachDevice( deviceId ) {

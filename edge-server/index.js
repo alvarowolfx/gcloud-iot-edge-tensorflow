@@ -28,7 +28,14 @@ async function gracefulShutdown() {
   try {
     console.info( 'SIGTERM signal received.' )
     console.info( 'Shutting down server.' )
-    await server.stop()
+    await Promise.race( [
+      server.stop(),
+      new Promise( ( resolve, reject ) => {
+        setTimeout( () => {
+          reject()
+        }, 5000 )
+      } )
+    ] )
     process.exit( 0 )
   } catch ( err ) {
     console.error( 'Forced shutdown', err )
