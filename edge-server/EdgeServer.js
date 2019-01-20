@@ -17,7 +17,7 @@ class EdgeServer {
     this.classifier = new ImageClassifier( classifier )
     this.gateway = new CloudIoTCoreGateway( gateway )
     this.web = new WebInterface( web )      
-    this.limiter = new RateLimiter( 2, 'minute' )
+    this.limiter = new RateLimiter( 1, 'minute' )
 
     this.deviceQueue = {}
   }
@@ -27,16 +27,16 @@ class EdgeServer {
     await this.classifier.load()
     this.deviceListener.start()
     this.web.start()
-    this.gateway.start()
+    await this.gateway.start()
 
-    this.deviceListener.onDeviceAdded( ( deviceId ) => {      
-      this.gateway.attachDevice( deviceId )
+    this.deviceListener.onDeviceAdded( async ( deviceId ) => {      
+      await this.gateway.attachDevice( deviceId )
       this.gateway.publishDeviceState( deviceId, { status : 'online' } )
     } )
 
-    this.deviceListener.onDeviceRemoved( ( deviceId ) => {      
-      this.gateway.detachDevice( deviceId )
+    this.deviceListener.onDeviceRemoved( async ( deviceId ) => {      
       this.gateway.publishDeviceState( deviceId, { status : 'offline' } )
+      this.gateway.detachDevice( deviceId )
     } )
 
     this.run()    
@@ -49,11 +49,11 @@ class EdgeServer {
     return Object.keys( this.deviceQueue ).length > 0 
   }
 
-  queueData( device, { classes, trackedClasses, countClasses } ) { 
-    if ( classes.length === 0 ) {
-      return
+  queueData( device, { classes, trackedClasses, countClasses } ) {     
+    if ( classes.length === 0 ) {     
+      classes = [ 'empty' ] 
+      countClasses = { empty : 1 }      
     }       
-
     const { name } = device
     const deviceData = this.deviceQueue[name]
     if ( !deviceData ) {
@@ -134,12 +134,18 @@ class EdgeServer {
           logger.info( '[PublishData] Sending data to cloud iot core.' )
           const publishPromises = Object.keys( this.deviceQueue ).map( ( deviceId ) => {
             const res = this.deviceQueue[deviceId]
-            return this.gateway.publishDeviceTelemetry( deviceId, res.countClasses )
-          } )    
-          logger.info( `Promises ${publishPromises}` )
-          this.clearQueue()                    
+            // Check if is just empty
+            if ( res.countClasses.empty && Object.keys( res.countClasses ).length === 1 ) {
+              logger.info( '[Empty] Message ' )
+              return this.gateway.publishDeviceTelemetry( deviceId, { classes : {} } )
+            } 
+            delete res.countClasses.empty
+            return this.gateway.publishDeviceTelemetry( deviceId, { classes : res.countClasses } )
+          } )              
           await Promise.all( publishPromises )
+          this.clearQueue()                    
         } else {
+          
           logger.info( '[PublishData] Publishing throttled.' )
         }
       }
@@ -166,14 +172,15 @@ class EdgeServer {
 
     logger.info( 'Sending offline events' )
     try {
+      logger.info( 'Sending gateway offline event' )
+      await this.gateway.publishGatewayState( { status : 'offline' } )    
       const publishPromises = devices.map( ( device ) => {
         logger.info( `Sending offline event for device ${device.name}` )
         return this.gateway.publishDeviceState( device.name, { status : 'offline' } )
       } )      
       await Promise.all( publishPromises )
-      logger.info( 'Sending gateway offline event' )
-      await this.gateway.publishGatewayState( { status : 'offline' } )    
       logger.info( 'All offline events sent' )
+      await new Promise( resolve => setTimeout( resolve, 1000 ) )
     } catch ( err ) {
       logger.error( `Error sending data to cloud iot core ${err}`, err )
     }

@@ -55,13 +55,21 @@ class CloudIoTCoreGateway {
     
     // Create a client, and connect to the Google MQTT bridge
     this.iatTime = parseInt( Date.now() / 1000 )    
-    this.client = mqtt.connect( connectionArgs )    
+    this.client = mqtt.connect( connectionArgs )
+    this.client.on( 'connect', ( success ) => {
+      if ( success ) {
+        logger.info( 'Client connected.' )
+  
+      } else {
+        logger.info( 'Client not connected.' )
+      }
+    } )
   }
 
-  checkConnection() {
+  checkConnection() {    
     const secsFromIssue = parseInt( Date.now() / 1000 ) - this.iatTime
     if ( secsFromIssue > this.tokenExpMins * 60 ) {      
-      logger.info( `\tRefreshing token after ${secsFromIssue} seconds.` )
+      logger.info( `Refreshing token after ${secsFromIssue} seconds.` )
       this.connect()
     }
   }

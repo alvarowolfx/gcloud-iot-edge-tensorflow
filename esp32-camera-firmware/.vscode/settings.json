@@ -7,6 +7,7 @@
     "sdkconfig.h": "c",
     "qr_recoginize.h": "c",
     "ov2640.h": "c",
-    "sensor.h": "c"
+    "sensor.h": "c",
+    "esp_wifi.h": "c"
   }
 }
