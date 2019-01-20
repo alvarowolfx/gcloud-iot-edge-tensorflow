@@ -17,9 +17,10 @@ class EdgeServer {
     this.classifier = new ImageClassifier( classifier )
     this.gateway = new CloudIoTCoreGateway( gateway )
     this.web = new WebInterface( web )      
-    this.limiter = new RateLimiter( 1, 'minute' )
+    this.limiter = new RateLimiter( 3, 'minute' )
 
     this.deviceQueue = {}
+    this.lastDeviceData = {}
   }
 
   async start() {
@@ -45,46 +46,48 @@ class EdgeServer {
     await this.gateway.publishGatewayState( { status : 'online' } )
   }
 
-  hasData() {
-    return Object.keys( this.deviceQueue ).length > 0 
+  hasChanges() {    
+    const hasChanged = Object.keys( this.deviceQueue ).some( ( deviceId ) => {
+      return JSON.stringify( this.deviceQueue[deviceId] ) !== JSON.stringify( this.lastDeviceData[deviceId] ) 
+    } )
+    return hasChanged
   }
 
-  queueData( device, { classes, trackedClasses, countClasses } ) {     
-    if ( classes.length === 0 ) {     
-      classes = [ 'empty' ] 
-      countClasses = { empty : 1 }      
-    }       
+  queueData( device, { classes, trackedClasses, countClasses } ) {
     const { name } = device
-    const deviceData = this.deviceQueue[name]
+    let deviceData = this.deviceQueue[name]    
     if ( !deviceData ) {
-      this.deviceQueue[name] = {
+      deviceData = {
         name,
-        classes, 
-        trackedClasses,
-        countClasses
+        classes : [], 
+        trackedClasses : [],
+        countClasses : {},
       }      
-    } else {      
-      const classesSet = new Set( deviceData.classes.concat( classes ) )
-      const nClasses = [ ...classesSet ]
-
-      const trackedClassesSet = new Set( deviceData.trackedClasses.concat( trackedClasses ) )
-      const nTrackedClasses = [ ...trackedClassesSet ]
-
-      const nCountClasses = {
-        ...deviceData.countClasses,
-        ...countClasses
-      }
-      Object.keys( nCountClasses ).forEach( ( key ) => {
-        nCountClasses[key] = Math.max( deviceData.countClasses[key], countClasses[key] ) || 1
-      } )
-
-      this.deviceQueue[name] = {
-        name,
-        classes : nClasses, 
-        trackedClasses : nTrackedClasses,
-        countClasses : nCountClasses
-      }  
+      this.deviceQueue[name] = deviceData
     }
+
+    const classesSet = new Set( deviceData.classes.concat( classes ) )
+    const nClasses = [ ...classesSet ]
+
+    const trackedClassesSet = new Set( deviceData.trackedClasses.concat( trackedClasses ) )
+    const nTrackedClasses = [ ...trackedClassesSet ]
+
+    const nCountClasses = {
+      ...deviceData.countClasses,
+      ...countClasses
+    }
+    Object.keys( nCountClasses ).forEach( ( key ) => {
+      nCountClasses[key] = Math.max( deviceData.countClasses[key], countClasses[key] ) || 1
+    } )
+
+    const nDeviceData = {
+      name,
+      classes : nClasses, 
+      trackedClasses : nTrackedClasses,
+      countClasses : nCountClasses
+    }      
+    
+    this.deviceQueue[name] = nDeviceData
   }
 
   clearQueue() {
@@ -129,17 +132,12 @@ class EdgeServer {
 
     // Send data to cloud iot core    
     try {
-      if ( this.hasData() ) {
+      if ( this.hasChanges() ) {
         if ( this.limiter.tryRemoveTokens( 1 ) ) {        
           logger.info( '[PublishData] Sending data to cloud iot core.' )
           const publishPromises = Object.keys( this.deviceQueue ).map( ( deviceId ) => {
             const res = this.deviceQueue[deviceId]
-            // Check if is just empty
-            if ( res.countClasses.empty && Object.keys( res.countClasses ).length === 1 ) {
-              logger.info( '[Empty] Message ' )
-              return this.gateway.publishDeviceTelemetry( deviceId, { classes : {} } )
-            } 
-            delete res.countClasses.empty
+            this.lastDeviceData[deviceId] = res                        
             return this.gateway.publishDeviceTelemetry( deviceId, { classes : res.countClasses } )
           } )              
           await Promise.all( publishPromises )
