@@ -43,7 +43,8 @@ class EdgeServer {
     this.run()    
     // this.ticker = setInterval( this.run.bind( this ), 10000 )
     
-    await this.gateway.publishGatewayState( { status : 'online' } )
+    const serverInfo = this.web.getServerInfo()
+    await this.gateway.publishGatewayState( { status : 'online', server : serverInfo } )
   }
 
   hasChanges() {    

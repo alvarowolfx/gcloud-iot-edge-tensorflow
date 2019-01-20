@@ -1,4 +1,5 @@
 const express = require( 'express' )
+const ip = require( 'ip' )
 const { Server } = require( 'http' )
 const SocketIO = require( 'socket.io' )
 
@@ -27,7 +28,13 @@ class WebInterface {
     this.server.close( () => {
       logger.info( 'Done' )
     } )
+  }
 
+  getServerInfo() {    
+    return {
+      port : this.port,
+      ip : ip.address(),
+    }
   }
 
   indexHandler( req, res ) {
