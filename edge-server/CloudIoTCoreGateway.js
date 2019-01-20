@@ -58,8 +58,7 @@ class CloudIoTCoreGateway {
     this.client = mqtt.connect( connectionArgs )
     this.client.on( 'connect', ( success ) => {
       if ( success ) {
-        logger.info( 'Client connected.' )
-  
+        logger.info( 'Client connected.' )        
       } else {
         logger.info( 'Client not connected.' )
       }
@@ -95,7 +94,7 @@ class CloudIoTCoreGateway {
       finalPayload = JSON.stringify( payload )
     }
 
-    const mqttTopic = `/devices/${deviceId}/${eventType}`
+    const mqttTopic = `/devices/${deviceId}/${eventType}`    
     return this.client.publish( mqttTopic, finalPayload, { qos : 0 } )
   }
 

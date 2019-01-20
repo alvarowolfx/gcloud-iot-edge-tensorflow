@@ -32,7 +32,7 @@ class EdgeServer {
 
     this.deviceListener.onDeviceAdded( async ( deviceId ) => {      
       await this.gateway.attachDevice( deviceId )
-      this.gateway.publishDeviceState( deviceId, { status : 'online' } )
+      this.gateway.publishDeviceState( deviceId, { status : 'online', type : 'camera' } )
     } )
 
     this.deviceListener.onDeviceRemoved( async ( deviceId ) => {      
@@ -42,9 +42,9 @@ class EdgeServer {
 
     this.run()    
     // this.ticker = setInterval( this.run.bind( this ), 10000 )
-    
+
     const serverInfo = this.web.getServerInfo()
-    await this.gateway.publishGatewayState( { status : 'online', server : serverInfo } )
+    await this.gateway.publishGatewayState( { status : 'online', server : serverInfo, type : 'gateway' } )
   }
 
   hasChanges() {    
@@ -179,7 +179,7 @@ class EdgeServer {
       } )      
       await Promise.all( publishPromises )
       logger.info( 'All offline events sent' )
-      await new Promise( resolve => setTimeout( resolve, 1000 ) )
+      await new Promise( resolve => setTimeout( resolve, 2000 ) )
     } catch ( err ) {
       logger.error( `Error sending data to cloud iot core ${err}`, err )
     }
