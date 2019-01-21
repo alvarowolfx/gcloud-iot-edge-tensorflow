@@ -2,64 +2,234 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Welcome to Firebase Hosting</title>
-
-    <!-- update the version number as needed -->
-    <script defer src="/__/firebase/5.8.0/firebase-app.js"></script>
-    <!-- include only the Firebase features as you need -->
-    <script defer src="/__/firebase/5.8.0/firebase-auth.js"></script>
-    <script defer src="/__/firebase/5.8.0/firebase-database.js"></script>
-    <script defer src="/__/firebase/5.8.0/firebase-messaging.js"></script>
-    <script defer src="/__/firebase/5.8.0/firebase-storage.js"></script>
-    <!-- initialize the SDK after all desired features are loaded -->
-    <script defer src="/__/firebase/init.js"></script>
-
-    <style media="screen">
-      body { background: #ECEFF1; color: rgba(0,0,0,0.87); font-family: Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; }
-      #message { background: white; max-width: 360px; margin: 100px auto 16px; padding: 32px 24px; border-radius: 3px; }
-      #message h2 { color: #ffa100; font-weight: bold; font-size: 16px; margin: 0 0 8px; }
-      #message h1 { font-size: 22px; font-weight: 300; color: rgba(0,0,0,0.6); margin: 0 0 16px;}
-      #message p { line-height: 140%; margin: 16px 0 24px; font-size: 14px; }
-      #message a { display: block; text-align: center; background: #039be5; text-transform: uppercase; text-decoration: none; color: white; padding: 16px; border-radius: 4px; }
-      #message, #message a { box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24); }
-      #load { color: rgba(0,0,0,0.4); text-align: center; font-size: 13px; }
-      @media (max-width: 600px) {
-        body, #message { margin-top: 0; background: white; box-shadow: none; }
-        body { border-top: 16px solid #ffa100; }
+    <meta content="width=device-width,initial-scale=1,minimal-ui" name="viewport">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700,400italic|Material+Icons">
+    <link rel="stylesheet" href="https://unpkg.com/vue-material@beta/dist/vue-material.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/vue-material@beta/dist/theme/default.css">
+    <style>
+      body {
+        height: 100%;
       }
-    </style>
-  </head>
-  <body>
-    <div id="message">
-      <h2>Welcome</h2>
-      <h1>Firebase Hosting Setup Complete</h1>
-      <p>You're seeing this because you've successfully setup Firebase Hosting. Now it's time to go build something extraordinary!</p>
-      <a target="_blank" href="https://firebase.google.com/docs/hosting/">Open Hosting Documentation</a>
-    </div>
-    <p id="load">Firebase SDK Loading&hellip;</p>
+  
+      .md-app {
+        overflow: hidden;
+        height: 100%;
+      }
 
-    <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        // // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
-        // // The Firebase SDK is initialized and available here!
-        //
-        // firebase.auth().onAuthStateChanged(user => { });
-        // firebase.database().ref('/path/to/ref').on('value', snapshot => { });
-        // firebase.messaging().requestPermission().then(() => { });
-        // firebase.storage().ref('/path/to/ref').getDownloadURL().then(() => { });
-        //
-        // // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
+      .online {
+        background-color: green !important;
+      }
 
-        try {
-          let app = firebase.app();
-          let features = ['auth', 'database', 'messaging', 'storage'].filter(feature => typeof app[feature] === 'function');
-          document.getElementById('load').innerHTML = `Firebase SDK loaded with ${features.join(', ')}`;
-        } catch (e) {
-          console.error(e);
-          document.getElementById('load').innerHTML = 'Error loading the Firebase SDK, check the console.';
+      .offline {
+        background-color: orangered !important;
+      }
+  
+      .md-app-content {
+        height: unset;
+      }
+  
+      .device-list {
+        display : flex;
+        flex-direction: row;
+        flex-wrap: wrap;        
+        justify-content: center;
+      }
+  
+      .device-item {      
+        width: 350px;
+        margin-bottom: 16px;
+      }
+  
+      .device-item img {
+        width: 100%;
+        height: 200px;
+      }
+      
+      @media only screen and (max-width: 600px) {
+        .device-item {
+          width: 95%;
+          margin : 5%;
         }
-      });
+  
+        .device-item img {
+          width: 100%;
+          height: unset;
+        }
+      }    
+    </style>
+    <title>IoT Cloud Monitor</title>
+  </head>
+  <body>          
+    <div id="app" class="page-container">
+      <md-app md-mode="fixed">
+        <md-app-toolbar class="md-primary" md-elevation="1">
+          <span style="flex: 1" class="md-title">IoT Edge - Cloud Monitor</span>          
+          <md-button @click="modalActive = true">Create Room</md-button>           
+        </md-app-toolbar>
+        <md-app-content>
+          <md-empty-state 
+            v-if="devices.length === 0" 
+            md-icon="devices_other" 
+            md-label="No devices found." 
+            md-description="Devices not yet in sync with the cloud.">
+          </md-empty-state>
+          <div v-for="room in allRooms" :key="room.id">
+            <md-subheader>{{room.name}}</md-subheader>             
+            <span v-if="devicesByRoom(room.id).length === 0" class="md-caption" style="margin-left: 24px">
+              No devices assgined.
+            </span>
+            <div class="device-list">          
+              <md-card v-for="device in devicesByRoom(room.id)" :key="device.name" class="device-item">
+                <md-card-header>
+                  <md-avatar class="md-avatar-icon md-small" :class="device.meta.status">
+                    <md-icon>{{device.icon}}</md-icon>
+                  </md-avatar>
+                  <div class="md-title">{{device.name}}</div>
+                  <div class="md-subhead">
+                    [{{device.meta.status}}] {{device.updated}}
+                  </div>
+                </md-card-header>
+                  
+                <md-card-content v-if="device.classes">                  
+                  <md-chip v-for="c in (Object.keys(device.classes || {}))" :key="c" class="md-primary">                    
+                    {{c}} ({{device.classes[c]}})    
+                  </md-chip>
+                  <span v-if="Object.keys(device.classes || {}).length === 0">
+                    Nothing found.
+                  </span>
+                  <md-field>
+                    <label for="room">Room</label>
+                    <md-select v-model="device.roomId" @md-selected="saveDeviceRoom(device)" md-dense>                      
+                      <md-option v-for="room in rooms" :key="room.id" :value="room.id">
+                        {{room.name}}
+                      </md-option>
+                      <md-option v-if="device.roomId">
+                          Remove from room
+                        </md-option>
+                    </md-select>
+                  </md-field>                  
+                </md-card-content>                
+                <md-card-actions v-if="device.meta && device.meta.server">
+                  <md-button :href="'http://' + device.meta.server.ip + ':' + device.meta.server.port" target="_blank">
+                    Open local monitor
+                    <md-icon>open_in_new</md-icon>
+                  </md-button>
+                </md-card-actions>
+              </md-card>                        
+            </div>
+          </div>   
+          <md-dialog-prompt
+            @md-confirm="saveRoom"
+            :md-active.sync="modalActive"
+            v-model="roomName"
+            md-title="Room name"
+            md-input-maxlength="30"
+            md-input-placeholder="Type the room name..."
+            md-confirm-text="Create" />
+                
+        </md-app-content>
+      </md-app>
+    </div>
+    
+    <script defer src="/__/firebase/5.8.0/firebase-app.js"></script>    
+    <script defer src="/__/firebase/5.8.0/firebase-database.js"></script>
+    <script defer src="/__/firebase/init.js"></script>
+    <script src="https://unpkg.com/vue"></script>
+    <script src="https://unpkg.com/vue-material@beta"></script>
+    
+    <script>
+      Vue.use(VueMaterial.default)
+      document.addEventListener('DOMContentLoaded', function() {              
+        
+        const app = firebase.app()
+        const db = app.database()
+    
+        var vm = new Vue({
+          el: '#app',
+          data: {
+            devices: [],
+            rooms : [],
+            modalActive: false,
+            roomName: null
+          },
+          computed : {
+            allRooms : function(){
+              var allRooms = [].concat(this.rooms)
+              var unassignedDevices = this.devicesByRoom(0)
+              if ( unassignedDevices.length > 0 ) {
+                allRooms.push({ id : 0, name : 'Unassigned Devices' } )
+              }
+              var gateways = this.devicesByRoom('gateway')
+              if ( gateways.length > 0 ) {                
+                allRooms.push({ id : 'gateway', name : 'Gateways' } )
+              }
+              return allRooms
+            }
+          },          
+          methods : {            
+            saveDeviceRoom : function(device){
+              // Hack to solve a bug on md-select
+              var context = this;
+              setTimeout(function () {                                  
+                var deviceId = device.name
+                device = context.devices.find( function(device){
+                  return device.name  === deviceId
+                })
+                var deviceRef = db.ref('devices/'+device.name)
+                deviceRef.update({
+                  roomId : device.roomId
+                })
+              }, 0 )
+            },
+            saveRoom : function(){
+              if ( this.roomName && this.roomName.length > 0 ){
+                db.ref('rooms').push(this.roomName)
+              }
+            },
+            devicesByRoom : function(roomId){
+              return this.devices.filter(function(device){
+                return device.roomId === roomId
+              })
+            }
+          }
+        })
+
+        db.ref('rooms').on('value', function(snap) {
+          var rooms = snap.val() || {}
+          vm.rooms = Object.keys( rooms ).map( function(key) {
+            return {
+              id: key,
+              name : rooms[key]
+            }
+          })
+        })
+
+        db.ref('devices').on('value', function(snap) {          
+          var devices = snap.val() || {}
+          var nDevices = Object.keys( devices ).map( function(key) {
+            var device = devices[key]
+            device.name = key
+            if ( device.data ) {
+              device.classes = device.data.classes || {}
+              device.updated = new Date(device.data.updated)
+            } else {
+              device.updated = new Date(device.meta.updated)
+            }
+            if ( !device.roomId ){
+              device.roomId = 0
+            }
+            device.icon = 'camera_alt'
+            if ( device.meta.type === 'gateway' ) {
+              device.roomId = 'gateway'
+              device.icon = 'router'
+            }
+            device.updated = device.updated.toLocaleDateString() + ' ' + device.updated.toLocaleTimeString()
+            return device
+          })
+          vm.devices = nDevices
+        })
+
+      })
     </script>
   </body>
 </html>

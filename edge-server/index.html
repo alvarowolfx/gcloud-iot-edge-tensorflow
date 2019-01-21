@@ -23,11 +23,13 @@
     .device-list {
       display : flex;
       flex-direction: row;
-      flex-wrap: wrap;
+      flex-wrap: wrap;        
+      justify-content: center;
     }
 
     .device-item {      
       width: 250px;
+      margin-bottom: 16px;
     }
 
     .device-item img {
@@ -45,9 +47,7 @@
         width: 100%;
         height: unset;
       }
-    }
-
-    
+    }    
   </style>
   <title>IoT Edge Server Monitor</title>
 </head>
@@ -55,8 +55,8 @@
 <body>
   <div id="app" class="page-container">
     <md-app md-mode="fixed">
-      <md-app-toolbar class="md-primary">
-        <span class="md-title">IoT Edge - Local Monitor</span>
+      <md-app-toolbar class="md-accent">
+        <span class="md-title">IoT Edge - Local Monitor</span>        
       </md-app-toolbar>
       <md-app-content>
         <md-empty-state 
@@ -70,19 +70,19 @@
               <md-card-header>
                 <div class="md-title">{{device.name}}</div>
                 <div class="md-subhead">{{device.updatedString}}</div>
-              </md-card-header>
+              </md-card-header>              
 
               <md-card-media>
                 <img :src="device.imageUrl" alt="camera">
               </md-card-media>
 
               <md-card-content>
-                <b v-for="c in (device.classes || [])">
+                <md-chip v-for="c in (device.classes || [])" class="md-primary">
                   {{c}}({{device.countClasses[c]}})
-                </b>
-                <b v-if="(device.classes || []).length === 0">
+                </md-chip>                 
+                <span v-if="(device.classes || []).length === 0">
                   Nothing found.
-                </b>
+                </span>
               </md-card-content>
             </md-card>          
         </div>
@@ -111,7 +111,7 @@
       }
     })
 
-    var socket = io.connect('http://localhost:3000');
+    var socket = io.connect(':3000/');
     socket.on('devices', function (data) {      
       vm.devices = data
     });
