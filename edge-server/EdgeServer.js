@@ -93,10 +93,11 @@ class EdgeServer {
 
   clearQueue() {
     this.deviceQueue = {}
+    this.lastDeviceData = {}
   }
 
   async run() {
-    const devices = this.deviceListener.getDevices()
+    const devices = this.deviceListener.getDevices()    
     const promises = devices.map( async ( device ) => {
       logger.info( `Looking for image from ${device.name}` )
       try {
