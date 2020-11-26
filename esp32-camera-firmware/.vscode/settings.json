@@ -1,6 +1,6 @@
 {
   "terminal.integrated.env.osx": {
-    "PATH": "/Users/alvaroviebrantz/.platformio/penv/bin:/Users/alvaroviebrantz/.platformio/penv:/Users/alvaroviebrantz/bin:/Users/alvaroviebrantz/Library/Android/sdk/tools/bin:/Users/alvaroviebrantz/Library/Android/sdk/platform-tools:/Users/alvaroviebrantz/Documents/Desenvolvimento/google-cloud-sdk/bin:/Users/alvaroviebrantz/.mos/bin:/Users/alvaroviebrantz/Documents/Desenvolvimento/Flutter/sdk/bin:/Users/alvaroviebrantz/.nvm/versions/node/v8.11.1/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/go/bin:/Users/alvaroviebrantz/Documents/Desenvolvimento/go/gocode/bin",
+    "PATH": "/Users/alvaroviebrantz/.platformio/penv/bin:/Users/alvaroviebrantz/.platformio/penv:/Users/alvaroviebrantz/bin:/Users/alvaroviebrantz/Library/Android/sdk/tools/bin:/Users/alvaroviebrantz/Library/Android/sdk/platform-tools:/Users/alvaroviebrantz/Documents/Desenvolvimento/google-cloud-sdk/bin:/Users/alvaroviebrantz/.mos/bin:/Users/alvaroviebrantz/Documents/Desenvolvimento/Flutter/sdk/bin:/Users/alvaroviebrantz/.nvm/versions/node/v10.13.0/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/go/bin:/Users/alvaroviebrantz/Documents/Desenvolvimento/go/gocode/bin:/Users/alvaroviebrantz/.fastlane/bin:/Users/alvaroviebrantz/Documents/Desenvolvimento/leverege/platform/build-tools/src:/Users/alvaroviebrantz/Documents/Desenvolvimento/leverege/platform/terraform-k8s",
     "PLATFORMIO_CALLER": "vscode"
   },
   "files.associations": {

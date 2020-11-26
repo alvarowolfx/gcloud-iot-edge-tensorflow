@@ -4,10 +4,10 @@
   "description": "",
   "main": "index.js",
   "dependencies": {
-    "@tensorflow-models/coco-ssd": "^0.1.1",
-    "@tensorflow-models/mobilenet": "^0.2.2",
-    "@tensorflow/tfjs": "^0.14.1",
-    "@tensorflow/tfjs-node": "^0.2.1",
+    "@tensorflow-models/coco-ssd": "^1.0.2",
+    "@tensorflow-models/mobilenet": "^1.0.1",
+    "@tensorflow/tfjs": "^1.1.2",
+    "@tensorflow/tfjs-node": "^1.1.2",
     "abort-controller": "^2.0.0",
     "async-mqtt": "^2.0.0",
     "express": "^4.16.4",
@@ -24,7 +24,7 @@
   },
   "devDependencies": {},
   "scripts": {
-    "start" : "node index.js",
+    "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",

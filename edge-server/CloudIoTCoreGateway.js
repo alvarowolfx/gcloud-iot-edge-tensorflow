@@ -7,7 +7,7 @@ const createLogger = require( './Log' )
 const logger = createLogger( 'CloudIoTCoreGateway' )
 
 class CloudIoTCoreGateway {
-  constructor( { projectId, cloudRegion, registryId, gatewayId, privateKeyFile } ) {          
+  constructor( { projectId, cloudRegion, registryId, gatewayId, privateKeyFile } ) {
     this.projectId = projectId
     this.cloudRegion = cloudRegion
     this.registryId = registryId
@@ -15,24 +15,24 @@ class CloudIoTCoreGateway {
     this.privateKeyFile = privateKeyFile
 
     this.tokenExpMins = 20 // Token expiration time in minutes
-  }  
+  }
 
   start() {
     this.connect()
-    this.connectionTicker = setInterval( this.checkConnection.bind( this ), 10000 )    
+    this.connectionTicker = setInterval( this.checkConnection.bind( this ), 10000 )
   }
 
   stop() {
-    logger.info( 'Closing...' )    
+    logger.info( 'Closing...' )
     if ( this.client ) {
       this.client.end()
     }
-    if ( this.connectionTicker ) { 
+    if ( this.connectionTicker ) {
       clearInterval( this.connectionTicker )
     }
     logger.info( 'Done' )
   }
-  
+
   connect() {
     if ( this.client ) {
       this.client.end()
@@ -52,22 +52,22 @@ class CloudIoTCoreGateway {
       protocol : 'mqtts',
       secureProtocol : 'TLSv1_2_method',
     }
-    
+
     // Create a client, and connect to the Google MQTT bridge
-    this.iatTime = parseInt( Date.now() / 1000 )    
+    this.iatTime = parseInt( Date.now() / 1000 )
     this.client = mqtt.connect( connectionArgs )
     this.client.on( 'connect', ( success ) => {
       if ( success ) {
-        logger.info( 'Client connected.' )        
+        logger.info( 'Client connected.' )
       } else {
         logger.info( 'Client not connected.' )
       }
     } )
   }
 
-  checkConnection() {    
+  checkConnection() {
     const secsFromIssue = parseInt( Date.now() / 1000 ) - this.iatTime
-    if ( secsFromIssue > this.tokenExpMins * 60 ) {      
+    if ( secsFromIssue > this.tokenExpMins * 60 ) {
       logger.info( `Refreshing token after ${secsFromIssue} seconds.` )
       this.connect()
     }
@@ -78,7 +78,7 @@ class CloudIoTCoreGateway {
    * private key.
    */
   createJwt() {
-    const algorithm = 'ES256'    
+    const algorithm = 'ES256'
     const token = {
       iat : parseInt( Date.now() / 1000 ),
       exp : parseInt( Date.now() / 1000 ) + this.tokenExpMins * 60,
@@ -94,7 +94,7 @@ class CloudIoTCoreGateway {
       finalPayload = JSON.stringify( payload )
     }
 
-    const mqttTopic = `/devices/${deviceId}/${eventType}`    
+    const mqttTopic = `/devices/${deviceId}/${eventType}`
     return this.client.publish( mqttTopic, finalPayload, { qos : 0 } )
   }
 
@@ -111,15 +111,15 @@ class CloudIoTCoreGateway {
   }
 
   publishDeviceState( deviceId, payload ) {
-    return this.publish( deviceId, payload, 'state' )        
+    return this.publish( deviceId, payload, 'state' )
   }
 
   publishGatewayTelemetry( payload ) {
-    return this.publish( this.gatewayId, payload, 'events' )        
+    return this.publish( this.gatewayId, payload, 'events' )
   }
 
   publishGatewayState( payload ) {
-    return this.publish( this.gatewayId, payload, 'state' )        
+    return this.publish( this.gatewayId, payload, 'state' )
   }
 }
 

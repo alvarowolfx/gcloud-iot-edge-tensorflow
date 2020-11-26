@@ -14,7 +14,7 @@
     .md-app {
       overflow: hidden;
       height: 100%;
-      max-height: 100vh;  
+      max-height: 100vh;
     }
 
     .md-app-content {
@@ -22,13 +22,13 @@
     }
 
     .device-list {
-      display : flex;
+      display: flex;
       flex-direction: row;
-      flex-wrap: wrap;        
+      flex-wrap: wrap;
       justify-content: center;
     }
 
-    .device-item {      
+    .device-item {
       width: 250px;
       margin-bottom: 16px;
     }
@@ -37,18 +37,18 @@
       width: 100%;
       height: 200px;
     }
-    
+
     @media only screen and (max-width: 600px) {
       .device-item {
         width: 95%;
-        margin : 5%;
+        margin: 5%;
       }
 
       .device-item img {
         width: 100%;
         height: unset;
       }
-    }    
+    }
   </style>
   <title>IoT Edge Server Monitor</title>
 </head>
@@ -57,35 +57,32 @@
   <div id="app" class="page-container">
     <md-app md-mode="fixed">
       <md-app-toolbar class="md-accent">
-        <span class="md-title">IoT Edge - Local Monitor</span>        
+        <span class="md-title">IoT Edge - Local Monitor</span>
       </md-app-toolbar>
       <md-app-content>
-        <md-empty-state 
-          v-if="devices.length === 0" 
-          md-icon="devices_other" 
-          md-label="No cameras found." 
+        <md-empty-state v-if="devices.length === 0" md-icon="devices_other" md-label="No cameras found."
           md-description="Devices are searched via mDNS on the local network.">
         </md-empty-state>
-        <div class="device-list">          
-            <md-card v-for="device in devices" :key="device.name" class="device-item">
-              <md-card-header>
-                <div class="md-title">{{device.name}}</div>
-                <div class="md-subhead">{{device.updatedString}}</div>
-              </md-card-header>              
+        <div class="device-list">
+          <md-card v-for="device in orderedDevices" :key="device.name" class="device-item">
+            <md-card-header>
+              <div class="md-title">{{device.name}}</div>
+              <div class="md-subhead">{{device.updatedString}}</div>
+            </md-card-header>
 
-              <md-card-media>
-                <img :src="device.imageUrl" alt="camera">
-              </md-card-media>
+            <md-card-media>
+              <img :src="device.imageUrl" alt="camera">
+            </md-card-media>
 
-              <md-card-content>
-                <md-chip v-for="c in (device.classes || [])" class="md-primary">
-                  {{c}}({{device.countClasses[c]}})
-                </md-chip>                 
-                <span v-if="(device.classes || []).length === 0">
-                  Nothing found.
-                </span>
-              </md-card-content>
-            </md-card>          
+            <md-card-content>
+              <md-chip v-for="c in (device.classes || [])" class="md-primary">
+                {{c}}({{device.countClasses[c]}})
+              </md-chip>
+              <span v-if="(device.classes || []).length === 0">
+                Nothing found.
+              </span>
+            </md-card-content>
+          </md-card>
         </div>
       </md-app-content>
     </md-app>
@@ -101,8 +98,13 @@
       data: {
         devices: []
       },
+      computed: {
+        orderedDevices: function () {
+          return Array.from(this.devices).sort((a, b) => a.name.localeCompare(b.name))
+        }
+      },
       watch: {
-        devices: function (newDevices, oldDevices) {          
+        devices: function (newDevices, oldDevices) {
           newDevices.forEach(function (device) {
             device.updated = new Date().getTime()
             device.updatedString = new Date().toLocaleString()
@@ -113,7 +115,7 @@
     })
 
     var socket = io.connect(':3000/');
-    socket.on('devices', function (data) {      
+    socket.on('devices', function (data) {
       vm.devices = data
     });
   </script>

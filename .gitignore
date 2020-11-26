@@ -3,3 +3,10 @@
 node_modules
 *.log
 .firebase
+.ipynb_checkpoints
+custom_model/**/*.jpg
+custom_model/**/*.xml
+custom_model/**/*.csv
+custom_model/**/*.record
+custom_model/**/*.pb
+custom_model/**/*.h5

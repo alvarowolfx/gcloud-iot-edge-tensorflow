@@ -1,0 +1,24 @@
+item {
+  id: 1
+  name: 'raspberry'
+}
+
+item {
+  id: 2
+  name: 'muffin'
+}
+
+item {
+  id: 3
+  name: 'berry'
+}
+
+item {
+  id: 4
+  name: 'popcorn'
+}
+
+item {
+  id: 5
+  name: 'jam'
+}
